@@ -12,6 +12,7 @@ void fillDict(FILE *file, char ***dict_ref, char ****texts_ref, int *textLine_re
     char line[1000];
     char *token = NULL;
     int lineCount = 0;
+    int satirsayisi = 0;
 
     while (fgets(line, 1000, file) != NULL)
     {
@@ -52,6 +53,8 @@ void fillDict(FILE *file, char ***dict_ref, char ****texts_ref, int *textLine_re
 
         (*texts_ref)[*textLine_ref] = (char **)realloc((*texts_ref)[*textLine_ref], sizeof(char *) * lineCount);
         (*textLine_ref)++;
+
+        satirsayisi++;
     }
 }
 
@@ -81,7 +84,6 @@ bool contains(char *word, char **text)
 
         if (strcmp(word, text[i]) == 0)
         {
-            // printf("Word: %s\n", word);
             return true;
         }
     }
@@ -118,6 +120,32 @@ void compute_gradient(bool **hotVectors, float *labels, int dictCap, float *weig
     }
 }
 
+void compute_gradient_sgd(bool **hotVectors, float *labels, int dictCap, float *weights, float **grad_ref, int randomCount)
+{
+    int k = 0, l = 0;
+    for (int i = 0; i < dictCap; i++)
+    {
+        (*grad_ref)[i] = 0;
+        int usedIndexes[randomCount];
+        int usedIndexCount = 0;
+        for (int k = 0; k < randomCount; k++)
+        {
+            int j = rand() % TRAINING_SIZE;
+            for (int l = 0; l < usedIndexCount; l++)
+            {
+                if (usedIndexes[l] == j)
+                {
+                    k--;
+                    continue;
+                }
+            }
+            usedIndexes[usedIndexCount] = j;
+            (*grad_ref)[i] += (tanh((float)hotVectors[j][i] * weights[i]) - labels[j]) * (float)hotVectors[j][i] * (1 / pow(cosh((float)hotVectors[j][i] * weights[i]), 2));
+        }
+        (*grad_ref)[i] /= randomCount;
+    }
+}
+
 void gradient_descent(float **c_hist, float ***w_hist, bool **hotVectors, float *labels, int dictCap, float *weights, float alpha, int num_iters)
 {
     float *grad = (float *)malloc(sizeof(float) * dictCap);
@@ -143,6 +171,70 @@ void gradient_descent(float **c_hist, float ***w_hist, bool **hotVectors, float 
     free(grad);
 }
 
+void gradient_descent_sgd(float **c_hist, float ***w_hist, bool **hotVectors, float *labels, int dictCap, float *weights, float alpha, int num_iters, int randomCount)
+{
+    float *grad = (float *)malloc(sizeof(float) * dictCap);
+    for (int i = 0; i < num_iters; i++)
+    {
+        compute_gradient_sgd(hotVectors, labels, dictCap, weights, &grad, randomCount);
+        for (int j = 0; j < dictCap; j++)
+        {
+            weights[j] -= alpha * grad[j];
+        }
+
+        if (i < 100000)
+        {
+            for (int j = 0; j < dictCap; j++)
+                (*w_hist)[i][j] = weights[j];
+            (*c_hist)[i] = compute_cost(hotVectors, labels, dictCap, weights);
+        }
+
+        if (i % (int)ceil(num_iters / 10) == 0)
+            printf("iter: %d, cost: %f\n", i, (*c_hist)[i]);
+    }
+
+    free(grad);
+}
+
+void adam(float **c_hist, float ***w_hist, bool **hotVectors, float *labels, int dictCap, float *weights, float alpha, int num_iters, float beta1, float beta2, float epsilon)
+{
+    float *grad = (float *)malloc(sizeof(float) * dictCap);
+    float *m = (float *)malloc(sizeof(float) * dictCap);
+    memset(m, 0, sizeof(float) * dictCap);
+    float *v = (float *)malloc(sizeof(float) * dictCap);
+    memset(v, 0, sizeof(float) * dictCap);
+
+    for (int i = 1; i <= num_iters; i++)
+    {
+        compute_gradient(hotVectors, labels, dictCap, weights, &grad);
+
+        for (int j = 0; j < dictCap; j++)
+        {
+            m[j] = beta1 * m[j] + (1 - beta1) * grad[j];
+            v[j] = beta2 * v[j] + (1 - beta2) * pow(grad[j], 2);
+
+            float m_hat = m[j] / (1 - pow(beta1, i));
+            float v_hat = v[j] / (1 - pow(beta2, i));
+
+            weights[j] -= alpha * m_hat / (sqrt(v_hat) + epsilon);
+        }
+
+        if (i < 100000)
+        {
+            for (int j = 0; j < dictCap; j++)
+                (*w_hist)[i - 1][j] = weights[j];
+            (*c_hist)[i - 1] = compute_cost(hotVectors, labels, dictCap, weights);
+        }
+
+        if (i % (int)ceil(num_iters / 10) == 0)
+            printf("iter: %d, cost: %f\n", i, (*c_hist)[i - 1]);
+    }
+
+    free(grad);
+    free(m);
+    free(v);
+}
+
 void gd_test(float *weights, bool **hotVectors, float *labels, int dictCap)
 {
     int i, count = 0, isTrue;
@@ -159,6 +251,98 @@ void gd_test(float *weights, bool **hotVectors, float *labels, int dictCap)
     }
 
     printf("True Count : %d\n", count);
+}
+
+void get_start_comparison(FILE *file, float *temp_weights, float **weights, int dictCap, float **c_hist, float ***w_hist, bool **hotVectors, float *labels, float alpha, int num_iters, void (*func)(float **c_hist, float ***w_hist, bool **hotVectors, float *labels, int dictCap, float *weights, float alpha, int num_iters))
+{
+    int i;
+    for (i = 0; i < dictCap; i++)
+        (*weights)[i] = temp_weights[i];
+
+    clock_t start, end;
+
+    start = clock();
+    (*func)(c_hist, w_hist, hotVectors, labels, dictCap, *weights, alpha, num_iters);
+    end = clock();
+
+    fprintf(file, "%f,", (double)(end - start) / CLOCKS_PER_SEC);
+    for (i = 0; i < num_iters; i++)
+    {
+        if (i != num_iters - 1)
+            fprintf(file, "%f,", (*c_hist)[i]);
+        else
+            fprintf(file, "%f\n", (*c_hist)[i]);
+    }
+}
+
+void sgd_start(float **c_hist, float ***w_hist, bool **hotVectors, float *labels, int dictCap, float *weights, float alpha, int num_iters)
+{
+    gradient_descent_sgd(c_hist, w_hist, hotVectors, labels, dictCap, weights, alpha, num_iters, 1);
+}
+
+void adam_start(float **c_hist, float ***w_hist, bool **hotVectors, float *labels, int dictCap, float *weights, float alpha, int num_iters)
+{
+    float beta1 = 0.9, beta2 = 0.999;
+    adam(c_hist, w_hist, hotVectors, labels, dictCap, weights, alpha, num_iters, beta1, beta2, 1e-8);
+}
+
+void comparison_for5value(float **weights, int dictCap, float **c_hist, float ***w_hist, bool **hotVectors, float *labels, float alpha, int num_iters)
+{
+    int p = 0, i;
+
+    FILE *file = fopen("costs.txt", "w");
+    float temp_weights[dictCap];
+
+    for (p = 0; p < 5; p++)
+    {
+        for (i = 0; i < dictCap; i++)
+            temp_weights[i] = (float)rand() / RAND_MAX;
+
+        get_start_comparison(file, temp_weights, weights, dictCap, c_hist, w_hist, hotVectors, labels, alpha, num_iters, &gradient_descent);
+        get_start_comparison(file, temp_weights, weights, dictCap, c_hist, w_hist, hotVectors, labels, alpha, num_iters, &sgd_start);
+        get_start_comparison(file, temp_weights, weights, dictCap, c_hist, w_hist, hotVectors, labels, alpha, num_iters, &adam_start);
+    }
+
+    fclose(file);
+}
+
+void start_for_get_weights(void (*func)(float **c_hist, float ***w_hist, bool **hotVectors, float *labels, int dictCap, float *weights, float alpha, int num_iters), FILE *file, float **weights, int dictCap, float **c_hist, float ***w_hist, bool **hotVectors, float *labels, float alpha, int num_iters, float *temp_weights)
+{
+    int i;
+    for (i = 0; i < dictCap; i++)
+        (*weights)[i] = temp_weights[i];
+
+    (*func)(c_hist, w_hist, hotVectors, labels, dictCap, *weights, alpha, num_iters);
+
+    for (i = 0; i < num_iters; i++)
+    {
+        for (int j = 0; j < dictCap; j++)
+        {
+            if (j != dictCap - 1)
+                fprintf(file, "%f,", (*w_hist)[i][j]);
+            else
+                fprintf(file, "%f\n", (*w_hist)[i][j]);
+        }
+    }
+}
+
+void get_weights(float **weights, int dictCap, float **c_hist, float ***w_hist, bool **hotVectors, float *labels, float alpha, int num_iters)
+{
+    int i, j;
+    float temp_weights[dictCap];
+    FILE *file = fopen("weights.txt", "w+");
+
+    for (j = 0; j < 5; j++)
+    {
+        for (i = 0; i < dictCap; i++)
+            temp_weights[i] = -5.0 + (float)rand() / ((float)RAND_MAX / 10.0);
+
+        start_for_get_weights(&gradient_descent, file, weights, dictCap, c_hist, w_hist, hotVectors, labels, alpha, num_iters, temp_weights);
+        // start_for_get_weights(&sgd_start, file, weights, dictCap, c_hist, w_hist, hotVectors, labels, alpha, num_iters, temp_weights);
+        // start_for_get_weights(&adam_start, file, weights, dictCap, c_hist, w_hist, hotVectors, labels, alpha, num_iters, temp_weights);
+    }
+
+    fclose(file);
 }
 
 int main()
@@ -194,26 +378,92 @@ int main()
     srand(time(NULL));
 
     float *weights = (float *)malloc(sizeof(float) * dictCap);
-    for (i = 0; i < dictCap; i++)
-        weights[i] = (float)rand() / RAND_MAX;
 
-    int num_iters = 10000;
-    int epocs = (num_iters < 100000 ? num_iters : 100000);
+    char inp = 'a';
 
-    float **w_hist = (float **)malloc(sizeof(float *) * epocs);
-    for (i = 0; i < epocs; i++)
-        w_hist[i] = (float *)malloc(sizeof(float) * dictCap);
+    int epocs;
+    float **w_hist;
+    float *c_hist;
 
-    float *c_hist = (float *)malloc(sizeof(float) * epocs);
+    while (inp != '0' && inp != 'q')
+    {
+        printf("1. Gradient Descent\n2. Stochastic Gradient Descent\n3. Adam\n4. Get Weights\n5. Comparison\n0. Exit\n");
+        printf("Enter your choice: ");
+        scanf(" %c", &inp);
 
-    gradient_descent(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, 0.01, num_iters);
+        clock_t start, end;
 
-    printf("Final Cost: %f\n", compute_cost(hotVectors, labels, dictCap, weights));
-    printf("Final Weights: ");
-    for (i = 0; i < dictCap; i++)
-        printf("%f ", weights[i]);
+        for (i = 0; i < dictCap; i++)
+            weights[i] = (float)rand() / RAND_MAX;
 
-    gd_test(weights, hotVectors, labels, dictCap);
+        int num_iters = 10000;
+        float alpha = 0.01;
+
+        if (inp != '0' && inp != 'q')
+        {
+            printf("Enter number of iterations: ");
+            scanf("%d", &num_iters);
+
+            printf("Enter learning rate: ");
+            scanf("%f", &alpha);
+        }
+
+        epocs = (num_iters < 100000 ? num_iters : 100000);
+
+        w_hist = (float **)malloc(sizeof(float *) * epocs);
+        for (i = 0; i < epocs; i++)
+            w_hist[i] = (float *)malloc(sizeof(float) * dictCap);
+
+        c_hist = (float *)malloc(sizeof(float) * epocs);
+
+        switch (inp)
+        {
+        case '1':
+            start = clock();
+
+            gradient_descent(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epocs);
+            end = clock();
+            break;
+        case '2':
+            printf("Enter number of random samples: ");
+            int randomCount = 1;
+            scanf("%d", &randomCount);
+            start = clock();
+            gradient_descent_sgd(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epocs, randomCount);
+            end = clock();
+            break;
+        case '3':
+        {
+            float beta1 = 0.9, beta2 = 0.999;
+            printf("Enter beta1: ");
+            scanf("%f", &beta1);
+            printf("Enter beta2: ");
+            scanf("%f", &beta2);
+            start = clock();
+            adam(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epocs, beta1, beta2, 1e-8);
+            end = clock();
+            break;
+        }
+        case '4':
+            get_weights(&weights, dictCap, &c_hist, &w_hist, hotVectors, labels, alpha, num_iters);
+            break;
+        case '5':
+            comparison_for5value(&weights, dictCap, &c_hist, &w_hist, hotVectors, labels, alpha, num_iters);
+            break;
+        }
+
+        if (inp != '0' && inp != 'q' && inp != '4' && inp != '5')
+        {
+            printf("Time taken: %.3f\n", (double)(end - start) / CLOCKS_PER_SEC);
+            printf("Final Cost: %f\n", c_hist[epocs - 1]);
+            printf("\nFinal Weights: ");
+            for (i = 0; i < dictCap; i++)
+                printf("%f ", weights[i]);
+            printf("\n");
+
+            gd_test(weights, hotVectors, labels, dictCap);
+        }
+    }
 
     // Free allocated memory
     for (i = 0; i < dictCap; i++)
