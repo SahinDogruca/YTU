@@ -12,7 +12,7 @@ void fillDict(FILE *file, char ***dict_ref, char ****texts_ref, int *textLine_re
     char line[1000];
     char *token = NULL;
     int lineCount = 0;
-    int satirsayisi = 0;
+    int rowCount = 0;
 
     while (fgets(line, 1000, file) != NULL)
     {
@@ -54,7 +54,7 @@ void fillDict(FILE *file, char ***dict_ref, char ****texts_ref, int *textLine_re
         (*texts_ref)[*textLine_ref] = (char **)realloc((*texts_ref)[*textLine_ref], sizeof(char *) * lineCount);
         (*textLine_ref)++;
 
-        satirsayisi++;
+        rowCount++;
     }
 }
 
@@ -381,7 +381,7 @@ int main()
 
     char inp = 'a';
 
-    int epocs;
+    int epochs;
     float **w_hist;
     float *c_hist;
 
@@ -408,20 +408,20 @@ int main()
             scanf("%f", &alpha);
         }
 
-        epocs = (num_iters < 100000 ? num_iters : 100000);
+        epochs = (num_iters < 100000 ? num_iters : 100000);
 
-        w_hist = (float **)malloc(sizeof(float *) * epocs);
-        for (i = 0; i < epocs; i++)
+        w_hist = (float **)malloc(sizeof(float *) * epochs);
+        for (i = 0; i < epochs; i++)
             w_hist[i] = (float *)malloc(sizeof(float) * dictCap);
 
-        c_hist = (float *)malloc(sizeof(float) * epocs);
+        c_hist = (float *)malloc(sizeof(float) * epochs);
 
         switch (inp)
         {
         case '1':
             start = clock();
 
-            gradient_descent(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epocs);
+            gradient_descent(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epochs);
             end = clock();
             break;
         case '2':
@@ -429,7 +429,7 @@ int main()
             int randomCount = 1;
             scanf("%d", &randomCount);
             start = clock();
-            gradient_descent_sgd(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epocs, randomCount);
+            gradient_descent_sgd(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epochs, randomCount);
             end = clock();
             break;
         case '3':
@@ -440,7 +440,7 @@ int main()
             printf("Enter beta2: ");
             scanf("%f", &beta2);
             start = clock();
-            adam(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epocs, beta1, beta2, 1e-8);
+            adam(&c_hist, &w_hist, hotVectors, labels, dictCap, weights, alpha, epochs, beta1, beta2, 1e-8);
             end = clock();
             break;
         }
@@ -455,7 +455,7 @@ int main()
         if (inp != '0' && inp != 'q' && inp != '4' && inp != '5')
         {
             printf("Time taken: %.3f\n", (double)(end - start) / CLOCKS_PER_SEC);
-            printf("Final Cost: %f\n", c_hist[epocs - 1]);
+            printf("Final Cost: %f\n", c_hist[epochs - 1]);
             printf("\nFinal Weights: ");
             for (i = 0; i < dictCap; i++)
                 printf("%f ", weights[i]);
@@ -486,7 +486,7 @@ int main()
     free(labels);
     free(weights);
 
-    for (i = 0; i < epocs; i++)
+    for (i = 0; i < epochs; i++)
         free(w_hist[i]);
     free(w_hist);
     free(c_hist);
