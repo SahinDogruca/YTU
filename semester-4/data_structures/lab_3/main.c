@@ -10,7 +10,7 @@ void getInfos(int *N_ref, int *M_ref, int ***matrix_ref, int **ql_ref)
     printf("please enter column count (M) : ");
     scanf("%d", M_ref);
 
-    // matrix'i ve öncelikli kuyrukların uzunluklarını tutan arrayi oluşturur
+    // matrix'i ve öncelikli kuyrukların uzunluklarını tutan diziyi oluşturur
     (*matrix_ref) = (int **)malloc(sizeof(int *) * (*N_ref));
     for (i = 0; i < (*N_ref); i++)
         (*matrix_ref)[i] = (int *)malloc(sizeof(int) * (*M_ref));
@@ -35,7 +35,7 @@ void getInfos(int *N_ref, int *M_ref, int ***matrix_ref, int **ql_ref)
             printf("please enter %d. element of %d. queue : ", j + 1, i + 1);
             scanf("%d", &((*matrix_ref)[i][j]));
 
-            // girilen değer 0'dan büyük olmalıdır. Kontrolü burda yapılıyor.
+            // girilen değer 0'dan büyük olmalıdır. Kontrolü bur da yapılıyor.
             while ((*matrix_ref)[i][j] < 0)
             {
                 printf("elements must be greater than zero. Please enter a valid value : ");
@@ -121,25 +121,24 @@ void swap(int *a, int *b)
 // heapify fonksiyonu, bir array ve index alır, array'i heap haline getirir
 void heapify(int **array_ref, int i, int N)
 {
-    int l = i;
+    int largest = i; // En büyük elemanın indis'ini saklayacak değişken
 
-    if (2 * i + 1 < N && (*array_ref)[2 * l + 1] > (*array_ref)[l])
-        l = 2 * l + 1;
+    int left_child = 2 * i + 1;  // Sol çocuk düğümü indis'ini hesapla
+    int right_child = 2 * i + 2; // Sağ çocuk düğümün indis'ini hesapla
 
-    if (2 * i + 2 < N && (*array_ref)[2 * l + 2] > (*array_ref)[l])
-        l = 2 * l + 2;
+    if (left_child < N && (*array_ref)[left_child] > (*array_ref)[largest])
+        largest = left_child;
 
-    if (l != i)
+    if (right_child < N && (*array_ref)[right_child] > (*array_ref)[largest])
+        largest = right_child;
+
+    // En büyük değer kök değilse, yani kök değerden büyük bir çocuk varsa
+    if (largest != i)
     {
-        swap(&l, &i);
-        swap(&((*array_ref)[l]), &((*array_ref)[i]));
+        swap(&((*array_ref)[i]), &((*array_ref)[largest]));
 
-        printf("\n");
-        for (int j = 0; j < N; j++)
-            printf("%d ", (*array_ref)[j]);
-        printf("\n");
-
-        heapify(array_ref, i, N);
+        // Değişiklik yapıldıktan sonra, etkilenen alt ağaçta heapify işlemi tekrar çağrılır
+        heapify(array_ref, largest, N);
     }
 }
 
@@ -148,22 +147,15 @@ void build_max_heap(int **array_ref, int N)
 {
     int i;
 
-    // N/2'den 0'a kadar olan indexlerde heapify işlemi uygular, çünkü N/2'den sonraki indexler yapraklardır.
+    // N/2'den 0'a kadar olan indisler de heapify işlemi uygular, çünkü N/2'den sonraki indisler yapraklardır.
     for (i = N / 2 - 1; i >= 0; i--)
         heapify(array_ref, i, N);
 }
 
-// max_heap_matrix fonksiyonu, bir matrix ve uzunluklar arrayi alır, matrixteki her bir satırı heap haline getirir
+// max_heap_matrix fonksiyonu, bir matrix ve uzunluklar array'i alır, matris'deki her bir satırı heap haline getirir
 void max_heap_matrix(int ***matrix_ref, int N, int *ql)
 {
     int i;
-
-    printf("\nql\n");
-    for (i = 0; i < N; i++)
-    {
-        printf("%d ", ql[i]);
-    }
-    printf("\n");
 
     for (i = 0; i < N; i++)
         build_max_heap(&((*matrix_ref)[i]), ql[i]);
@@ -184,8 +176,8 @@ void delete_heap_max(int **array_ref, int *N_ref)
     build_max_heap(array_ref, (*N_ref));
 }
 
-// selectMax fonksiyonu, bir matrix, uzunluk ve cleared_queues arrayi alır, matrixteki en büyük elemanı seçer ve
-// cleared_queues arrayine ekler
+// selectMax fonksiyonu, bir matrix, uzunluk ve cleared_queues array'i alır, matris'deki en büyük elemanı seçer ve
+// cleared_queues array'ine ekler
 int selectMax(int **matrix, int N, int **cq_ref, int *cq_idx)
 {
     int i, j, max = -1, maxIndex = -1, flag = 1;
@@ -193,22 +185,22 @@ int selectMax(int **matrix, int N, int **cq_ref, int *cq_idx)
     for (i = 0; i < N; i++)
     {
         // eğer satırın ilk elemanı -1 değilse, en büyük elemanı seçer
-        if ((matrix)[i][0] > max)
+        if (matrix[i][0] > max)
         {
-            max = (matrix)[i][0];
+            max = matrix[i][0];
             maxIndex = i;
         }
 
-        // eğer satırın ilk elemanı -1 ise, cleared_queues arrayine ekler
+        // eğer satırın ilk elemanı -1 ise, cleared_queues array'ine ekler
         if (matrix[i][0] == -1)
         {
             flag = 1;
-            // cleared_queues arrayinde aynı eleman varsa eklemez
+            // cleared_queues array'inde aynı eleman varsa eklemez
             for (j = 0; j <= (*cq_idx); j++)
                 if ((*cq_ref)[j] == i + 1)
                     flag = 0;
 
-            // eğer önceden array'e eklenmemiş ise cleared_queues arrayine ekler
+            // eğer önce den array'e eklenmemiş ise cleared_queues array'ine ekler
             if (flag == 1)
                 (*cq_ref)[(*cq_idx)++] = i + 1;
         }
@@ -217,18 +209,18 @@ int selectMax(int **matrix, int N, int **cq_ref, int *cq_idx)
     return maxIndex;
 }
 
-// deleteMax fonksiyonu, bir matrix, uzunluk arrayi, N ve M alır,
-// teker teker matrixteki en büyük elemanı siler ve silinen her bir elemanın satırını tekrar heap haline getirir
+// deleteMax fonksiyonu, bir matrix, uzunluk array'i, N ve M alır,
+// teker teker matris'deki en büyük elemanı siler ve silinen her bir elemanın satırını tekrar heap haline getirir
 void deleteMax(int ***matrix_ref, int **ql_ref, int N, int M, int **cq_ref, int *cq_idx)
 {
 
     int maxIndex = -1, max, i;
-    // cleared_queues arrayini oluşturur
+    // cleared_queues array'ini oluşturur
     (*cq_ref) = (int *)malloc(sizeof(int) * N);
 
     do
     {
-        // en büyük elemanı seçer, ve indexini alır
+        // en büyük elemanı seçer, ve indis'ini alır
         maxIndex = selectMax(*matrix_ref, N, cq_ref, cq_idx);
 
         // eğer en büyük eleman varsa siler, eğer maxIndex -1 ise tüm elemanlar silinmiş demektir
@@ -244,9 +236,9 @@ void deleteMax(int ***matrix_ref, int **ql_ref, int N, int M, int **cq_ref, int 
             printf("Matrix after deleted %d : \n", max);
             printMatrix(*matrix_ref, N, M);
         }
-    } while (maxIndex != -1);
+    } while (maxIndex != -1 || (*cq_idx) < N);
 
-    // tüm elemanlar silinmiş ise cleared_queues arrayini yazdırır
+    // tüm elemanlar silinmiş ise cleared_queues array'ini yazdırır
     printf("Cleared queues nums : \n");
     for (i = 0; i < N; i++)
         printf("%d ", (*cq_ref)[i]);
@@ -268,10 +260,10 @@ int main()
     // değerleri aldıktan sonra oluşan ilk matrisi yazdırır
     printMatrix(matrix, N, M);
 
-    // matrixteki tüm satırlara max_heap_build fonksiyonunu uygular
+    // matris'deki tüm satırlara max_heap_build fonksiyonunu uygular
     max_heap_matrix(&matrix, N, queueLengths);
 
-    // matrixteki tüm satırlar heap olduktan sonraki halini yazdırır
+    // matris'deki tüm satırlar heap olduktan sonraki halini yazdırır
     printf("Max-heaped Matrix : \n");
     printMatrix(matrix, N, M);
 
