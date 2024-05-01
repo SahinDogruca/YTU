@@ -1,9 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+
+// matrix unique elemanlardan oluşuyor mu kontrolunu yapar.
+int check_for_repeat(int **matrix, int N, int *ql, int num)
+{
+    int i, j;
+
+    for (i = 0; i < N; i++)
+        for (j = 0; j < ql[i]; j++)
+            if (matrix[i][j] == num)
+                return 1;
+
+    return 0;
+}
 
 void getInfos(int *N_ref, int *M_ref, int ***matrix_ref, int **ql_ref)
 {
-    int i, j;
+    int i, j, select, num;
+    srand(time(NULL));
     printf("please enter row count (N) : ");
     scanf("%d", N_ref);
 
@@ -16,6 +31,15 @@ void getInfos(int *N_ref, int *M_ref, int ***matrix_ref, int **ql_ref)
         (*matrix_ref)[i] = (int *)malloc(sizeof(int) * (*M_ref));
 
     (*ql_ref) = (int *)malloc(sizeof(int) * (*N_ref));
+
+    printf("1- enter the values\n2- get random values\nselect option : ");
+    scanf("%d", &select);
+
+    while (select != 1 && select != 2)
+    {
+        printf("select value is invalid. Please enter again (1 or 2) : ");
+        scanf("%d", &select);
+    }
 
     // öncelikli kuyrukların uzunluklarını ve elemanlarını alır
     for (i = 0; i < (*N_ref); i++)
@@ -30,16 +54,38 @@ void getInfos(int *N_ref, int *M_ref, int ***matrix_ref, int **ql_ref)
             scanf("%d", &((*ql_ref)[i]));
         }
 
-        for (j = 0; j < (*ql_ref)[i]; j++)
+        if (select == 1)
         {
-            printf("please enter %d. element of %d. queue : ", j + 1, i + 1);
-            scanf("%d", &((*matrix_ref)[i][j]));
-
-            // girilen değer 0'dan büyük olmalıdır. Kontrolü bur da yapılıyor.
-            while ((*matrix_ref)[i][j] < 0)
+            for (j = 0; j < (*ql_ref)[i]; j++)
             {
-                printf("elements must be greater than zero. Please enter a valid value : ");
-                scanf("%d", &((*matrix_ref)[i][j]));
+                printf("please enter %d. element of %d. queue : ", j + 1, i + 1);
+                scanf("%d", &num);
+
+                // girilen değer 0'dan büyük olmalıdır. Kontrolü bur da yapılıyor.
+                while (num < 0)
+                {
+                    printf("elements must be greater than zero. Please enter a valid value : ");
+                    scanf("%d", &num);
+                }
+
+                while (check_for_repeat(*matrix_ref, *N_ref, *ql_ref, num))
+                {
+                    printf("elements must be unique. Please enter a valid value : ");
+                    scanf("%d", &num);
+                }
+
+                (*matrix_ref)[i][j] = num;
+            }
+        }
+        else if (select == 2)
+        {
+            for (j = 0; j < (*ql_ref)[i]; j++)
+            {
+                do
+                    num = rand() % 100;
+                while (check_for_repeat(*matrix_ref, *N_ref, *ql_ref, num));
+
+                (*matrix_ref)[i][j] = num;
             }
         }
 
@@ -47,36 +93,6 @@ void getInfos(int *N_ref, int *M_ref, int ***matrix_ref, int **ql_ref)
         for (j = (*ql_ref)[i]; j < (*M_ref); j++)
             (*matrix_ref)[i][j] = -1;
     }
-}
-
-void testInfos(int *N_ref, int *M_ref, int ***matrix_ref, int **ql_ref)
-{
-    (*N_ref) = 5;
-    (*M_ref) = 5;
-
-    int i, j;
-
-    (*matrix_ref) = (int **)malloc(sizeof(int *) * (*N_ref));
-    for (i = 0; i < (*N_ref); i++)
-        (*matrix_ref)[i] = (int *)malloc(sizeof(int) * (*M_ref));
-
-    (*ql_ref) = (int *)malloc(sizeof(int) * (*N_ref));
-
-    int ql[] = {4, 1, 2, 5, 1};
-
-    for (i = 0; i < (*N_ref); i++)
-        (*ql_ref)[i] = ql[i];
-
-    int grid[5][5] = {
-        {120, 10, 130, 20, -1},
-        {100, -1, -1, -1, -1},
-        {12, 03, -1, -1, -1},
-        {18, 24, 36, 48, 60},
-        {78, -1, -1, -1, -1}};
-
-    for (i = 0; i < (*N_ref); i++)
-        for (j = 0; j < (*M_ref); j++)
-            (*matrix_ref)[i][j] = grid[i][j];
 }
 
 // matrix'i yazdırır
